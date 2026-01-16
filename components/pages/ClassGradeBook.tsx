@@ -1272,7 +1272,7 @@ const ClassGradeBook = () => {
                     dataIndex: "currentScore",
                     key: "currentScore",
                     width: 150,
-                    render: (_, record) => (
+                    render: (_, record: any) => (
                       <InputNumber
                         min={0}
                         max={10}

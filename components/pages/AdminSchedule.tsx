@@ -2359,24 +2359,30 @@ const AdminSchedule = () => {
             >
               <InputNumber
                 style={{ width: "100%" }}
-                placeholder="Tự động từ session/lớp"
+                placeholder="Tự động từ lớp"
                 min={0}
                 formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                parser={(value) => value!.replace(/\$\s?|(,*)/g, '')}
+                parser={(value) => {
+                  const parsed = value!.replace(/\$\s?|(,*)/g, '');
+                  return parsed === '' ? 0 : Number(parsed);
+                }}
               />
             </Form.Item>
 
             <Form.Item
               label="Lương GV mỗi buổi"
               name="salaryPerSession"
-              tooltip="Lương giáo viên mỗi buổi (tự động điền từ session hoặc lớp nếu có)"
+              tooltip="Lương giáo viên mỗi buổi (tự động điền từ lớp nếu có)"
             >
               <InputNumber
                 style={{ width: "100%" }}
-                placeholder="Tự động từ session/lớp"
+                placeholder="Tự động từ lớp"
                 min={0}
                 formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                parser={(value) => value!.replace(/\$\s?|(,*)/g, '')}
+                parser={(value) => {
+                  const parsed = value!.replace(/\$\s?|(,*)/g, '');
+                  return parsed === '' ? 0 : Number(parsed);
+                }}
               />
             </Form.Item>
           </div>
@@ -2659,7 +2665,10 @@ const AdminSchedule = () => {
                 placeholder="Tự động từ lớp"
                 min={0}
                 formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                parser={(value) => value!.replace(/\$\s?|(,*)/g, '')}
+                parser={(value) => {
+                  const parsed = value!.replace(/\$\s?|(,*)/g, '');
+                  return parsed === '' ? 0 : Number(parsed);
+                }}
               />
             </Form.Item>
 
@@ -2673,7 +2682,10 @@ const AdminSchedule = () => {
                 placeholder="Tự động từ lớp"
                 min={0}
                 formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                parser={(value) => value!.replace(/\$\s?|(,*)/g, '')}
+                parser={(value) => {
+                  const parsed = value!.replace(/\$\s?|(,*)/g, '');
+                  return parsed === '' ? 0 : Number(parsed);
+                }}
               />
             </Form.Item>
           </div>
