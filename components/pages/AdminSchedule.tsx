@@ -839,14 +839,23 @@ const AdminSchedule = () => {
     }
   };
 
-  const handleEditSchedule = (event: ScheduleEvent, e: React.MouseEvent) => {
+  const handleEditSchedule = async (event: ScheduleEvent, e: React.MouseEvent) => {
     e.stopPropagation();
     setEditingEvent(event);
+    
+    // Tìm session tương ứng để lấy học phí và lương
+    const sessionForThisDate = attendanceSessions.find(
+      (session) => session["Class ID"] === event.class.id && session["Ngày"] === event.date
+    );
+    
     editForm.setFieldsValue({
       "Giờ bắt đầu": event.schedule["Giờ bắt đầu"] ? dayjs(event.schedule["Giờ bắt đầu"], "HH:mm") : null,
       "Giờ kết thúc": event.schedule["Giờ kết thúc"] ? dayjs(event.schedule["Giờ kết thúc"], "HH:mm") : null,
       "Phòng học": event.class["Phòng học"] || "",
       "Ghi chú": "",
+      // Tự động điền học phí và lương từ session (ưu tiên) hoặc từ lớp
+      tuitionPerSession: sessionForThisDate?.["Học phí mỗi buổi"] || event.class["Học phí mỗi buổi"] || undefined,
+      salaryPerSession: sessionForThisDate?.["Lương GV"] || event.class["Lương GV"] || undefined,
     });
     setIsEditModalOpen(true);
   };
@@ -999,18 +1008,44 @@ const AdminSchedule = () => {
         message.success("Đã tạo lịch học bù cho ngày này");
       }
 
-      // Cập nhật attendance session của ngày này (nếu có)
+      // Cập nhật hoặc tạo attendance session của ngày này
       const sessionForThisDate = attendanceSessions.find(
         (session) => session["Class ID"] === event.class.id && session["Ngày"] === dateStr
       );
 
       if (sessionForThisDate) {
+        // Cập nhật session đã có
         const sessionRef = ref(database, `datasheet/Điểm_danh_sessions/${sessionForThisDate.id}`);
-        await update(sessionRef, {
+        const sessionUpdate: any = {
           "Giờ bắt đầu": newStartTime,
           "Giờ kết thúc": newEndTime,
-        });
+        };
+        // Cập nhật học phí và lương nếu có
+        if (values.tuitionPerSession) sessionUpdate["Học phí mỗi buổi"] = values.tuitionPerSession;
+        if (values.salaryPerSession) sessionUpdate["Lương GV"] = values.salaryPerSession;
+        await update(sessionRef, sessionUpdate);
         message.success("Đã cập nhật lịch học bù và buổi điểm danh của ngày này");
+      } else {
+        // Tạo session mới nếu chưa có
+        const sessionsRef = ref(database, "datasheet/Điểm_danh_sessions");
+        const newSessionData: Omit<AttendanceSession, "id"> = {
+          "Mã lớp": event.class["Mã lớp"],
+          "Tên lớp": event.class["Tên lớp"],
+          "Class ID": event.class.id,
+          "Ngày": dateStr,
+          "Giờ bắt đầu": newStartTime,
+          "Giờ kết thúc": newEndTime,
+          "Giáo viên": event.class["Giáo viên chủ nhiệm"] || "",
+          "Teacher ID": event.class["Teacher ID"] || "",
+          "Trạng thái": "not_started",
+          "Điểm danh": [],
+          "Timestamp": dayjs().format("YYYY-MM-DD HH:mm:ss"),
+          // Lưu học phí và lương vào session - liên kết với học phí học sinh và lương giáo viên
+          "Học phí mỗi buổi": values.tuitionPerSession || event.class["Học phí mỗi buổi"] || undefined,
+          "Lương GV": values.salaryPerSession || event.class["Lương GV"] || undefined,
+        };
+        await push(sessionsRef, newSessionData);
+        message.success("Đã cập nhật lịch học bù và tạo session điểm danh mới");
       }
 
       setIsEditModalOpen(false);
@@ -2315,6 +2350,36 @@ const AdminSchedule = () => {
           <Form.Item label="Ghi chú" name="Ghi chú">
             <Input.TextArea rows={2} placeholder="Nhập ghi chú (tùy chọn)" />
           </Form.Item>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+            <Form.Item
+              label="Học phí mỗi buổi"
+              name="tuitionPerSession"
+              tooltip="Học phí mỗi buổi cho lớp này (tự động điền từ session hoặc lớp nếu có)"
+            >
+              <InputNumber
+                style={{ width: "100%" }}
+                placeholder="Tự động từ session/lớp"
+                min={0}
+                formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                parser={(value) => value!.replace(/\$\s?|(,*)/g, '')}
+              />
+            </Form.Item>
+
+            <Form.Item
+              label="Lương GV mỗi buổi"
+              name="salaryPerSession"
+              tooltip="Lương giáo viên mỗi buổi (tự động điền từ session hoặc lớp nếu có)"
+            >
+              <InputNumber
+                style={{ width: "100%" }}
+                placeholder="Tự động từ session/lớp"
+                min={0}
+                formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                parser={(value) => value!.replace(/\$\s?|(,*)/g, '')}
+              />
+            </Form.Item>
+          </div>
         </Form>
       </Modal>
 
@@ -2408,20 +2473,7 @@ const AdminSchedule = () => {
               const endTime = values.endTime.format("HH:mm");
               const dayOfWeek = values.date.day() === 0 ? 8 : values.date.day() + 1;
 
-              // Tìm session hiện có dựa trên Class ID và Ngày
-              let existingSessionId: string | null = null;
-              const sessionsSnapshot = await get(ref(database, "datasheet/Điểm_danh_sessions"));
-              if (sessionsSnapshot.exists()) {
-                const sessions = sessionsSnapshot.val();
-                const foundSession = Object.entries(sessions).find(([id, s]: [string, any]) =>
-                  s["Class ID"] === selectedClass.id && s["Ngày"] === sessionDate
-                );
-                if (foundSession) {
-                  existingSessionId = foundSession[0];
-                }
-              }
-
-              // 1. Tạo/cập nhật attendance session
+              // 1. Tạo attendance session với trạng thái not_started
               const sessionData: Omit<AttendanceSession, "id"> = {
                 "Mã lớp": selectedClass["Mã lớp"],
                 "Tên lớp": selectedClass["Tên lớp"],
@@ -2431,14 +2483,15 @@ const AdminSchedule = () => {
                 "Giờ kết thúc": endTime,
                 "Giáo viên": selectedClass["Giáo viên chủ nhiệm"] || "",
                 "Teacher ID": selectedClass["Teacher ID"] || "",
-                "Trạng thái": existingSessionId ? undefined : "not_started", // Giữ nguyên trạng thái nếu đang edit
-                "Điểm danh": existingSessionId ? undefined : [], // Giữ nguyên điểm danh nếu đang edit
+                "Trạng thái": "not_started",
+                "Điểm danh": [],
+                "Timestamp": dayjs().format("YYYY-MM-DD HH:mm:ss"),
+                // Lưu học phí và lương vào session - liên kết với học phí học sinh và lương giáo viên
                 "Học phí mỗi buổi": values.tuitionPerSession || selectedClass["Học phí mỗi buổi"] || undefined,
                 "Lương GV": values.salaryPerSession || selectedClass["Lương GV"] || undefined,
-                "Timestamp": dayjs().format("YYYY-MM-DD HH:mm:ss"),
               };
 
-              // 2. Tạo/cập nhật timetable entry để hiển thị trên lịch
+              // 2. Tạo timetable entry để hiển thị trên lịch
               const timetableData: Omit<TimetableEntry, "id"> = {
                 "Class ID": selectedClass.id,
                 "Mã lớp": selectedClass["Mã lớp"] || "",
@@ -2451,48 +2504,16 @@ const AdminSchedule = () => {
                 "Ghi chú": values.note || "",
               };
 
-              // Thực hiện luu vào firebase
+              // Thực hiện luu vào firebase song song
               const sessionsRef = ref(database, "datasheet/Điểm_danh_sessions");
               const timetableRef = ref(database, "datasheet/Thời_khoá_biểu");
 
-              if (existingSessionId) {
-                // Cập nhật session và timetable entry hiện có
-                const sessionUpdate: any = {};
-                if (sessionData["Học phí mỗi buổi"]) sessionUpdate["Học phí mỗi buổi"] = sessionData["Học phí mỗi buổi"];
-                if (sessionData["Lương GV"]) sessionUpdate["Lương GV"] = sessionData["Lương GV"];
-                sessionUpdate["Giờ bắt đầu"] = startTime;
-                sessionUpdate["Giờ kết thúc"] = endTime;
+              await Promise.all([
+                push(sessionsRef, sessionData),
+                push(timetableRef, timetableData)
+              ]);
 
-                // Tìm timetable entry để cập nhật
-                const timetableSnapshot = await get(timetableRef);
-                let timetableEntryId: string | null = null;
-                if (timetableSnapshot.exists()) {
-                  const timetableEntries = timetableSnapshot.val();
-                  const foundEntry = Object.entries(timetableEntries).find(([id, entry]: [string, any]) =>
-                    entry["Class ID"] === selectedClass.id && entry["Ngày"] === sessionDate
-                  );
-                  if (foundEntry) {
-                    timetableEntryId = foundEntry[0];
-                  }
-                }
-
-                await Promise.all([
-                  update(ref(database, `datasheet/Điểm_danh_sessions/${existingSessionId}`), sessionUpdate),
-                  timetableEntryId
-                    ? update(ref(database, `datasheet/Thời_khoá_biểu/${timetableEntryId}`), timetableData)
-                    : push(timetableRef, timetableData)
-                ]);
-
-                message.success("Đã cập nhật lịch học và session điểm danh");
-              } else {
-                // Tạo mới
-                await Promise.all([
-                  push(sessionsRef, sessionData),
-                  push(timetableRef, timetableData)
-                ]);
-
-                message.success("Đã thêm lịch học và tạo session điểm danh");
-              }
+              message.success("Đã thêm lịch học và tạo session điểm danh");
               setIsStaffScheduleModalOpen(false);
               setEditingStaffSchedule(null);
               staffScheduleForm.resetFields();
@@ -2524,40 +2545,37 @@ const AdminSchedule = () => {
                 value: c.id,
               }))}
               onChange={async (classId) => {
-                // Tự động điền học phí và lương từ lớp khi chọn lớp
                 const selectedClass = classes.find(c => c.id === classId);
                 if (selectedClass) {
-                  const formValues = staffScheduleForm.getFieldsValue();
-                  const sessionDate = formValues.date?.format("YYYY-MM-DD");
-                  
-                  // Nếu có ngày, thử load giá trị từ session trước
-                  if (sessionDate && classId) {
-                    try {
-                      const sessionsSnapshot = await get(ref(database, "datasheet/Điểm_danh_sessions"));
-                      if (sessionsSnapshot.exists()) {
-                        const sessions = sessionsSnapshot.val();
-                        const foundSession = Object.values(sessions).find((s: any) =>
-                          s["Class ID"] === classId && s["Ngày"] === sessionDate
-                        );
-                        if (foundSession) {
-                          // Ưu tiên giá trị từ session
-                          staffScheduleForm.setFieldsValue({
-                            tuitionPerSession: foundSession["Học phí mỗi buổi"] || selectedClass["Học phí mỗi buổi"] || undefined,
-                            salaryPerSession: foundSession["Lương GV"] || selectedClass["Lương GV"] || undefined,
-                          });
-                          return;
+                  const date = staffScheduleForm.getFieldValue("date");
+                  if (date) {
+                    // Kiểm tra xem đã có session cho lớp và ngày này chưa
+                    const sessionDate = date.format("YYYY-MM-DD");
+                    const sessionsRef = ref(database, "datasheet/Điểm_danh_sessions");
+                    const snapshot = await get(sessionsRef);
+                    let foundSession: any = null;
+                    if (snapshot.exists()) {
+                      const sessions = snapshot.val();
+                      for (const session of Object.values(sessions)) {
+                        const s = session as any;
+                        if (s["Class ID"] === classId && s["Ngày"] === sessionDate) {
+                          foundSession = s;
+                          break;
                         }
                       }
-                    } catch (error) {
-                      console.error("Error loading session:", error);
                     }
+                    // Tự động điền từ session đã có (ưu tiên) hoặc từ lớp
+                    staffScheduleForm.setFieldsValue({
+                      tuitionPerSession: foundSession?.["Học phí mỗi buổi"] || selectedClass["Học phí mỗi buổi"] || undefined,
+                      salaryPerSession: foundSession?.["Lương GV"] || selectedClass["Lương GV"] || undefined,
+                    });
+                  } else {
+                    // Chỉ điền từ lớp nếu chưa chọn ngày
+                    staffScheduleForm.setFieldsValue({
+                      tuitionPerSession: selectedClass["Học phí mỗi buổi"] || undefined,
+                      salaryPerSession: selectedClass["Lương GV"] || undefined,
+                    });
                   }
-                  
-                  // Nếu không có session, dùng giá trị từ lớp
-                  staffScheduleForm.setFieldsValue({
-                    tuitionPerSession: selectedClass["Học phí mỗi buổi"] || undefined,
-                    salaryPerSession: selectedClass["Lương GV"] || undefined,
-                  });
                 }
               }}
             />
@@ -2573,29 +2591,32 @@ const AdminSchedule = () => {
               style={{ width: "100%" }}
               placeholder="Chọn ngày học"
               onChange={async (date) => {
-                // Khi chọn ngày, nếu đã có lớp, thử load giá trị từ session
-                const formValues = staffScheduleForm.getFieldsValue();
-                const classId = formValues.classId;
-                if (classId && date) {
-                  const sessionDate = date.format("YYYY-MM-DD");
-                  try {
-                    const sessionsSnapshot = await get(ref(database, "datasheet/Điểm_danh_sessions"));
-                    if (sessionsSnapshot.exists()) {
-                      const sessions = sessionsSnapshot.val();
-                      const foundSession = Object.values(sessions).find((s: any) =>
-                        s["Class ID"] === classId && s["Ngày"] === sessionDate
-                      );
-                      if (foundSession) {
-                        const selectedClass = classes.find(c => c.id === classId);
-                        // Ưu tiên giá trị từ session
-                        staffScheduleForm.setFieldsValue({
-                          tuitionPerSession: foundSession["Học phí mỗi buổi"] || selectedClass?.["Học phí mỗi buổi"] || undefined,
-                          salaryPerSession: foundSession["Lương GV"] || selectedClass?.["Lương GV"] || undefined,
-                        });
+                if (date) {
+                  const classId = staffScheduleForm.getFieldValue("classId");
+                  if (classId) {
+                    const selectedClass = classes.find(c => c.id === classId);
+                    if (selectedClass) {
+                      // Kiểm tra xem đã có session cho lớp và ngày này chưa
+                      const sessionDate = date.format("YYYY-MM-DD");
+                      const sessionsRef = ref(database, "datasheet/Điểm_danh_sessions");
+                      const snapshot = await get(sessionsRef);
+                      let foundSession: any = null;
+                      if (snapshot.exists()) {
+                        const sessions = snapshot.val();
+                        for (const session of Object.values(sessions)) {
+                          const s = session as any;
+                          if (s["Class ID"] === classId && s["Ngày"] === sessionDate) {
+                            foundSession = s;
+                            break;
+                          }
+                        }
                       }
+                      // Tự động điền từ session đã có (ưu tiên) hoặc từ lớp
+                      staffScheduleForm.setFieldsValue({
+                        tuitionPerSession: foundSession?.["Học phí mỗi buổi"] || selectedClass["Học phí mỗi buổi"] || undefined,
+                        salaryPerSession: foundSession?.["Lương GV"] || selectedClass["Lương GV"] || undefined,
+                      });
                     }
-                  } catch (error) {
-                    console.error("Error loading session:", error);
                   }
                 }
               }}

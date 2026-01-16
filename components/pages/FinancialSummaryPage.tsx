@@ -353,10 +353,11 @@ const FinancialSummaryPage = () => {
       const teacher = teachers.find(t => t.id === teacherId);
       const teacherName = teacher?.["Họ và tên"] || teacher?.["Tên giáo viên"] || classData["Giáo viên chủ nhiệm"] || "Không xác định";
 
-      // Ưu tiên lấy lương từ điểm danh (session), fallback về Lớp học
+      // Lấy hệ số lương giáo viên - ưu tiên từ session, fallback về class
+      // Ưu tiên: Session > Class
       const teacherSalaryPerSession = parseSalaryValue(
         session["Lương GV"] ||          // 1. Từ Session (ưu tiên)
-        classData["Lương GV"]           // 2. Từ Lớp học (fallback)
+        classData["Lương GV"]             // 2. Từ Lớp học (fallback)
       );
       if (!teacherSalaryPerSession) return; // Bỏ qua nếu không có lương giáo viên
 
@@ -776,33 +777,24 @@ const FinancialSummaryPage = () => {
         const classId = session["Class ID"];
         const classData = classes.find(c => c.id === classId);
         
-        if (!session["Ngày"]) return;
+        if (!classData || !session["Ngày"]) return;
 
-        // Ưu tiên lấy giá từ session đã lưu, fallback về class/course
-        // Ưu tiên: Session > Class > Course
-        let pricePerSession = 0;
+        // Get price per session
+        const course = courses.find((c) => {
+          if (c["Khối"] !== classData["Khối"]) return false;
+          const classSubject = classData["Môn học"];
+          const courseSubject = c["Môn học"];
+          if (courseSubject === classSubject) return true;
+          const subjectOption = subjectOptions.find(
+            (opt) => opt.label === classSubject || opt.value === classSubject
+          );
+          if (subjectOption) {
+            return courseSubject === subjectOption.label || courseSubject === subjectOption.value;
+          }
+          return false;
+        });
         
-        if (session["Học phí mỗi buổi"]) {
-          // Lấy từ session (ưu tiên cao nhất)
-          pricePerSession = parseSalaryValue(session["Học phí mỗi buổi"]);
-        } else if (classData) {
-          // Fallback về class/course
-          const course = courses.find((c) => {
-            if (c["Khối"] !== classData["Khối"]) return false;
-            const classSubject = classData["Môn học"];
-            const courseSubject = c["Môn học"];
-            if (courseSubject === classSubject) return true;
-            const subjectOption = subjectOptions.find(
-              (opt) => opt.label === classSubject || opt.value === classSubject
-            );
-            if (subjectOption) {
-              return courseSubject === subjectOption.label || courseSubject === subjectOption.value;
-            }
-            return false;
-          });
-          pricePerSession = course?.Giá || parseSalaryValue(classData["Học phí mỗi buổi"]);
-        }
-        
+        const pricePerSession = course?.Giá || parseSalaryValue(classData["Học phí mỗi buổi"]);
         if (!pricePerSession) return;
 
         // Get session date info

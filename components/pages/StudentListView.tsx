@@ -4010,12 +4010,11 @@ const StudentTuitionTab: React.FC<{
     return studentsList;
   }, [classes, students, tuitionClassFilter]);
 
-  // Tính toán học phí từ Điểm danh (attendance sessions) thay vì từ Lớp học
+  // Tính toán học phí cố định (không theo tháng)
   const monthlyStats = useMemo(() => {
     // Sử dụng studentsFromClasses thay vì students
     const stats = studentsFromClasses.map((student) => {
-      // Tính học phí từ Điểm danh (attendance sessions)
-      // Lấy tất cả sessions mà học sinh có mặt hoặc vắng có phép
+      // Tính học phí từ Điểm danh (attendance sessions) - ưu tiên từ session
       const studentId = student.id;
       let totalRevenue = 0;
       let totalSessions = 0;
@@ -4024,9 +4023,8 @@ const StudentTuitionTab: React.FC<{
       const studentSessions = allAttendanceSessions.filter((session) => {
         const attendanceRecords = session["Điểm danh"] || [];
         return attendanceRecords.some(
-          (record: any) =>
-            record["Student ID"] === studentId &&
-            (record["Có mặt"] === true || record["Vắng có phép"] === true)
+          (record: any) => record["Student ID"] === studentId && 
+          (record["Trạng thái"] === "present" || record["Trạng thái"] === "absent_with_permission")
         );
       });
 
@@ -4036,6 +4034,7 @@ const StudentTuitionTab: React.FC<{
         const classInfo = classesMap.get(classId);
 
         // Ưu tiên lấy giá từ session đã lưu, fallback về class/course
+        // Ưu tiên: Session > Class > Course
         let pricePerSession = 0;
 
         if (session["Học phí mỗi buổi"]) {
@@ -4112,7 +4111,7 @@ const StudentTuitionTab: React.FC<{
 
     // Hiển thị tất cả học sinh, không filter bỏ ai
     return stats;
-  }, [studentsFromClasses, studentInvoices, classesMap, coursesMap]);
+  }, [studentsFromClasses, studentInvoices, classesMap, coursesMap, allAttendanceSessions, getCoursePrice]);
 
   // Filter monthly stats by student name (class filter đã được xử lý ở studentsFromClasses)
   const filteredMonthlyStats = useMemo(() => {

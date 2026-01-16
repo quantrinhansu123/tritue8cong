@@ -579,10 +579,11 @@ const InvoicePage = () => {
 
         const classId = session["Class ID"];
         const classInfo = classes.find((c) => c.id === classId);
-        // Ưu tiên lấy lương từ điểm danh (session), fallback về Lớp học/Giáo viên
+        // Lấy Lương GV - ưu tiên từ session, fallback về class, cuối cùng là teacher
+        // Ưu tiên: Session > Class > Teacher
         const salaryPerSession =
           parseCurrency(session["Lương GV"]) ||          // 1. Từ Session (ưu tiên)
-          parseCurrency(classInfo?.["Lương GV"]) ||      // 2. Từ Lớp học (fallback)
+          parseCurrency(classInfo?.["Lương GV"]) ||       // 2. Từ Lớp học (fallback)
           parseCurrency(teacher["Lương theo buổi"]);     // 3. Từ Giáo viên (fallback cuối)
 
         if (!salariesMap[key]) {
@@ -1053,20 +1054,7 @@ const InvoicePage = () => {
   };
 
   // Helper function to get price for a session
-  // Ưu tiên lấy từ điểm danh (session), fallback về class/course
   const getSessionPrice = (session: AttendanceSession): number => {
-    // 1. Ưu tiên lấy từ session (điểm danh) - liên kết trực tiếp với học phí học sinh
-    if (session["Học phí mỗi buổi"]) {
-      const parseCurrency = (value: unknown) => {
-        if (value === undefined || value === null) return 0;
-        const num = Number(String(value).replace(/[^0-9.-]+/g, ""));
-        return Number.isFinite(num) ? num : 0;
-      };
-      const sessionPrice = parseCurrency(session["Học phí mỗi buổi"]);
-      if (sessionPrice > 0) return sessionPrice;
-    }
-
-    // 2. Fallback về class/course
     const classId = session["Class ID"];
     const classInfo = classes.find((c) => c.id === classId);
 
@@ -2495,10 +2483,12 @@ const InvoicePage = () => {
         };
       }
 
+      // Lấy Lương GV - ưu tiên từ session, fallback về class, cuối cùng là teacher
+      // Ưu tiên: Session > Class > Teacher
       const salaryPerSession =
-        parseCurrency(classInfo?.["Lương GV"]) ||
-        parseCurrency(session["Lương GV"]) ||
-        parseCurrency(teacher?.["Lương theo buổi"]);
+        parseCurrency(session["Lương GV"]) ||          // 1. Từ Session (ưu tiên)
+        parseCurrency(classInfo?.["Lương GV"]) ||     // 2. Từ Lớp học (fallback)
+        parseCurrency(teacher?.["Lương theo buổi"]);  // 3. Từ Giáo viên (fallback cuối)
 
       const allowancePerSession = parseCurrency(session["Phụ cấp di chuyển"]);
 
@@ -3592,7 +3582,7 @@ const InvoicePage = () => {
         const classCode = session["Mã lớp"] || "";
         const key = `${classCode}-${className}`;
 
-        // Ưu tiên lấy lương từ điểm danh (session), fallback về class/course
+        // Find class info using Class ID from session
         const classId = session["Class ID"];
         const classInfo = classes.find((c) => c.id === classId);
 
@@ -3605,19 +3595,10 @@ const InvoicePage = () => {
           )
           : undefined;
 
-        // Ưu tiên: Session > Lớp học > Course
-        const parseCurrency = (value: unknown) => {
-          if (value === undefined || value === null) return 0;
-          const num = Number(String(value).replace(/[^0-9.-]+/g, ""));
-          return Number.isFinite(num) ? num : 0;
-        };
-
         const salaryPerSession =
-          parseCurrency(session["Lương GV"]) ||        // 1. Từ Session (ưu tiên)
-          parseCurrency(classInfo?.["Lương GV"]) ||    // 2. Từ Lớp học (fallback)
-          (record.bienChe === "Full-time"
-            ? (course?.["Lương GV Full-time"] || 0)    // 3. Từ Course Full-time
-            : (course?.["Lương GV Part-time"] || 0));  // 3. Từ Course Part-time
+          record.bienChe === "Full-time"
+            ? course?.["Lương GV Full-time"] || 0
+            : course?.["Lương GV Part-time"] || 0;
 
         if (!classSummary[key]) {
           classSummary[key] = {

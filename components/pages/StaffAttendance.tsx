@@ -30,7 +30,6 @@ import dayjs, { Dayjs } from "dayjs";
 import isSameOrAfter from "dayjs/plugin/isSameOrAfter";
 import isSameOrBefore from "dayjs/plugin/isSameOrBefore";
 import WrapperContent from "@/components/WrapperContent";
-import StaffTimesheet from "./StaffTimesheet";
 
 dayjs.extend(isSameOrAfter);
 dayjs.extend(isSameOrBefore);
@@ -450,11 +449,6 @@ const StaffAttendance = () => {
           </Col>
         </Row>
       ),
-    },
-    {
-      key: "monthly",
-      label: "Báo cáo tháng",
-      children: <StaffTimesheet />,
     },
   ];
 

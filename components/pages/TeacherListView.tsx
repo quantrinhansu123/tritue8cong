@@ -106,11 +106,10 @@ const getTuitionFromClassSession = (
   session: any,
   teacher?: Teacher
 ): number => {
-  // Ưu tiên lấy từ điểm danh (session), fallback về Lớp học/Giáo viên
   const candidates = [
-    session?.["Lương GV"],            // 1. Từ Session (ưu tiên)
-    classData?.["Lương GV"],          // 2. Từ Lớp học (fallback)
-    teacher?.["Lương theo buổi"],     // 3. Từ Giáo viên (fallback cuối)
+    classData?.["Lương GV"],
+    session?.["Lương GV"],
+    teacher?.["Lương theo buổi"],
   ];
   for (const candidate of candidates) {
     const salary = parseSalaryValue(candidate);
@@ -465,16 +464,17 @@ const TeacherListView: React.FC = () => {
       });
     }
 
-    // Tính lương từ từng session - ưu tiên lấy từ điểm danh (session)
+    // Tính lương từ từng session dựa trên lớp
     let totalSalary = 0;
     filteredSessions.forEach((session) => {
       const classId = session["Class ID"];
       const classData = classes.find(c => c.id === classId);
-      // Ưu tiên lấy từ điểm danh (session), fallback về Lớp học/Giáo viên
+      // Lấy Lương GV - ưu tiên từ session, fallback về class, cuối cùng là teacher
+      // Ưu tiên: Session > Class > Teacher
       const salaryForThisSession = parseSalaryValue(
-        session["Lương GV"] ??              // 1. Từ Session (ưu tiên)
-        classData?.["Lương GV"] ??          // 2. Từ Lớp học (fallback)
-        teacher?.["Lương theo buổi"]        // 3. Từ Giáo viên (fallback cuối)
+        session["Lương GV"] ??           // 1. Từ Session (ưu tiên)
+        classData?.["Lương GV"] ??       // 2. Từ Lớp học (fallback)
+        teacher?.["Lương theo buổi"]     // 3. Từ Giáo viên (fallback cuối)
       );
       totalSalary += salaryForThisSession;
     });
