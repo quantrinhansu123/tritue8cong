@@ -2357,15 +2357,12 @@ const AdminSchedule = () => {
               name="tuitionPerSession"
               tooltip="Học phí mỗi buổi cho lớp này (tự động điền từ session hoặc lớp nếu có)"
             >
-              <InputNumber
+              <InputNumber<number>
                 style={{ width: "100%" }}
                 placeholder="Tự động từ lớp"
                 min={0}
                 formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                parser={(value) => {
-                  const parsed = value!.replace(/\$\s?|(,*)/g, '');
-                  return parsed === '' ? 0 : Number(parsed);
-                }}
+                parser={(value) => Number((value || "0").toString().replace(/\$\s?|(,*)/g, ""))}
               />
             </Form.Item>
 
@@ -2374,15 +2371,12 @@ const AdminSchedule = () => {
               name="salaryPerSession"
               tooltip="Lương giáo viên mỗi buổi (tự động điền từ lớp nếu có)"
             >
-              <InputNumber
+              <InputNumber<number>
                 style={{ width: "100%" }}
                 placeholder="Tự động từ lớp"
                 min={0}
                 formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                parser={(value) => {
-                  const parsed = value!.replace(/\$\s?|(,*)/g, '');
-                  return parsed === '' ? 0 : Number(parsed);
-                }}
+                parser={(value) => Number((value || "0").toString().replace(/\$\s?|(,*)/g, ""))}
               />
             </Form.Item>
           </div>
@@ -2660,15 +2654,12 @@ const AdminSchedule = () => {
               name="tuitionPerSession"
               tooltip="Học phí mỗi buổi cho lớp này (tự động điền từ lớp nếu có)"
             >
-              <InputNumber
+              <InputNumber<number>
                 style={{ width: "100%" }}
                 placeholder="Tự động từ lớp"
                 min={0}
                 formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                parser={(value) => {
-                  const parsed = value!.replace(/\$\s?|(,*)/g, '');
-                  return parsed === '' ? 0 : Number(parsed);
-                }}
+                parser={(value) => Number((value || "0").toString().replace(/\$\s?|(,*)/g, ""))}
               />
             </Form.Item>
 
@@ -2677,15 +2668,12 @@ const AdminSchedule = () => {
               name="salaryPerSession"
               tooltip="Lương giáo viên mỗi buổi (tự động điền từ lớp nếu có)"
             >
-              <InputNumber
+              <InputNumber<number>
                 style={{ width: "100%" }}
                 placeholder="Tự động từ lớp"
                 min={0}
                 formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                parser={(value) => {
-                  const parsed = value!.replace(/\$\s?|(,*)/g, '');
-                  return parsed === '' ? 0 : Number(parsed);
-                }}
+                parser={(value) => Number((value || "0").toString().replace(/\$\s?|(,*)/g, ""))}
               />
             </Form.Item>
           </div>
